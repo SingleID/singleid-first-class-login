@@ -3,29 +3,29 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: http://www.singleid.com
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 0.8
+ * Version: 0.9
  * Author: Daniele Vantaggiato
  * Author URI: http://www.vantax.eu
  * License: GPL2
  
- {Plugin Name} is free software: you can redistribute it and/or modify
+ SingleID First-class Login Experience is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 2 of the License, or
  any later version.
  
- {Plugin Name} is distributed in the hope that it will be useful,
+ SingleID First-class Login Experience is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  GNU General Public License for more details.
  
  You should have received a copy of the GNU General Public License
- along with {Plugin Name}. If not, see {License URI}.
+ along with SingleID First-class Login Experience. If not, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html .
  
  */
 
 
 /*
-TO FIX before release!
+Internal note
 * 
 * get_option
 * handshake GOOD - DO RECHECK
@@ -52,10 +52,11 @@ Think cases for GAE e STE.
 */
 
 
-define( 'WP_DEBUG', true );
 
 
 defined('ABSPATH') or die('No script kiddies');
+
+define( 'WP_DEBUG', true );
 
 define('SINGLEID_SERVER_URL', 'https://app.singleid.com/');
 define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', '1234567890'); // get_option('singleid_tmp_password_for_auth'));
@@ -63,7 +64,7 @@ define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', '1234567890'); // get_option('single
 
 global $singleid_fcl_db_version;
 
-$singleid_fcl_db_version = '0.8';
+$singleid_fcl_db_version = '0.9';
 
 add_filter('allowed_http_origin', '__return_true'); // needed for allowing post data from the user's App
 
@@ -112,19 +113,10 @@ function singleid_fcl_install() {
     
     $sitename = get_bloginfo('name') . ' ' . get_bloginfo('description');
     
-    //	if ($sitename == ' '){
-    //		$sitename = get_bloginfo('wpurl');
-    //	}
-    
-    // add_option( 'singleid_basic_install', $sitename, '', 'no' ); // WHY!!!
-    
-    
     
     $logo_url = get_bloginfo('template_directory') . '/images/logo.jpg';
     
     add_option('singleid_logo_url', $logo_url, '', 'yes'); 	// WHY!!! not on https!
-    //add_option('singleid_LANGUAGE', 'en', '', 'no'); 		// WHY!!!
-    //add_option('singleid_requested_data', '1', '', 'no'); 	// WHY!!!
     
     $tmp_password_for_auth = singleid_random_chars(16);
     add_option('singleid_tmp_password_for_auth', $tmp_password_for_auth, '', 'yes');
@@ -138,7 +130,7 @@ function singleid_fcl_install() {
 
 function singleid_hide_buttons() {
 	// the old "add new" users button should be removed to avoid confusion
-	// maybe this should be optional in a future release of this plugin
+	// this should be optional in a future release of this plugin
     global $current_screen;
     
     if ($current_screen->id == 'users') {
@@ -264,7 +256,7 @@ function singleid_render_users_page() {
 add_action('admin_action_singleid_add_new', 'singleid_add_new_admin_action');
 function singleid_add_new_admin_action($who) {
     global $wpdb;
-    // creating user and requesting a first handshake to the device
+    // creating new user and requesting a first handshake to the device
     
     if (singleid_is_SingleID($who)){
 		$SingleID = $who;	// when we edit an user
@@ -272,31 +264,9 @@ function singleid_add_new_admin_action($who) {
 		$SingleID = $_POST['SingleID'];	//when we add a new user
 	}
     
-    // TODO check if is a valid SingleID
     error_log('We are creating a first handshake with '.$SingleID);
     
-				// move away
-				if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) { // needed for cloudflare flexible ssl
-					$root .= $_SERVER['HTTP_X_FORWARDED_PROTO'] . '://';
-				} else {
-					$root .= !empty($_SERVER['HTTPS']) ? "https://" : "http://";
-				}
-				
-				if ($root == 'https://') {
-					$ssl = 1;
-				} else {
-					$ssl = 0;
-				}
-				
-				$protocol[1] = 'https';
-				$protocol[0] = 'http';
-				
-				if (($ssl == 0) and (get_option('singleid_requested_data') <> '1')) { // { will be blocked ALSO server side }
-					error_log('SSL needed! ' . $ssl);
-					// DEBUG ONLY // wp_die('SSL Misconfiguration');
-				}
-    
-    
+	singleid_check_ssl();
     
     $UTID = singleid_random_chars(16);
     
@@ -384,7 +354,7 @@ function singleid_add_new_admin_action($who) {
 function singleid_do_not_use_this_page($user) {
     
     echo '<h2>Ops...</h2>
-    <h1>You should use the SingleID Add New page instead of this!</h1><hr>';
+    <h1>You <i>should</i> use the SingleID Add New User page instead of this!</h1><hr>';
     
 }
 
@@ -432,9 +402,8 @@ function singleid_save_custom_user_profile_fields($user_id) {
     
 		if ( $current_singleid == $_POST['SingleID']) {
 			// nothing to do ;-)!
-			error_log(' UGUALE!');
-			
 		} else {
+			
 			error_log(' DIFFERENT -> handshake requested!');
 			
 			// if is empty we remove and stop!
@@ -445,7 +414,12 @@ function singleid_save_custom_user_profile_fields($user_id) {
 			
 			// save *my* custom field
 			update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
-			singleid_add_new_admin_action($_POST['SingleID']);
+			
+			if (singleid_is_SingleID($_POST['SingleID'])){	// needed to avoid fake request also "null" value
+			
+				singleid_add_new_admin_action($_POST['SingleID']);
+			
+			}
 		}
     
     
@@ -526,7 +500,7 @@ add_action('wp_ajax_first_class_login_error', 'singleid_first_class_login_error_
 
 function singleid_first_class_login_error_callback() {
 	// Are you trying to log-in but you are already logged in!
-    die('Already Logged!');
+    wp_die('You are already Logged!');
 }
 
 
@@ -594,25 +568,7 @@ function singleid_first_class_login_callback() {
     
     
     
-    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) { // needed for cloudflare flexible ssl
-        $root .= $_SERVER['HTTP_X_FORWARDED_PROTO'] . '://';
-    } else {
-        $root .= !empty($_SERVER['HTTPS']) ? "https://" : "http://";
-    }
-    
-    if ($root == 'https://') {
-        $ssl = 1;
-    } else {
-        $ssl = 0;
-    }
-    
-    $protocol[1] = 'https';
-    $protocol[0] = 'http';
-    
-    if (($ssl == 0) and (get_option('singleid_requested_data') <> '1')) { // { will be blocked ALSO server side }
-        error_log('SSL needed! ' . $ssl);
-        // DEBUG ONLY // wp_die('SSL Misconfiguration');
-    }
+	singleid_check_ssl();
     
     
     
@@ -771,10 +727,10 @@ function singleid_wp_hook_callback() { // here we handle replies from App
         
         
         // TODO MITM HERE IS POSSIBLE?	
-        // Yes if the recipients do not use SSL and two devices are compromised
-        // BY THE WAY the admin of wordpress should check the received data... to investigate here
+        // Surely if recipient do not use SSL
+        // If SSL is enabled is much more complicated and it involve to hack at least two devices (to explain)
+        // BY THE WAY the admin of wordpress should check the received data... 
         
-        // Check if is a valid bcrypt with cost between 12 and 19
         $sql = "SELECT * FROM $table_data WHERE UTID = '" . md5($_POST['UTID']) . "' AND SingleID = '" . $_POST['SingleID'] . "' ORDER BY right_now DESC LIMIT 1";
         $result = $wpdb->get_row($sql) or die(mysql_error());
         
@@ -1015,14 +971,16 @@ function singleid_print_login_button($language = 'en', $requested_data = '1') {
     $label['en']['1,4,5']    = 'Identify with';
     $label['en']['1,4,6']    = 'Confirm with';
     
+    $today = date("Y-m-d H:i:s");		// these infos will be displayed on the user device!
+    $ip = singleid_gimme_visitor_ip();
     
     return '
         <div class="singleid_button_wrap singleid_pointer">
             <div class="single_text_single_id">' . $label[$language][$requested_data] . '</div>
             <div class="icon_box_single_id"><img src="' . plugins_url('css/SingleID/SingleID_logo_key.jpg', __FILE__) . '" alt="No more form filling, no more password" title="SingleID" /></div>
             
-            <input type="hidden" id="Login" class="SingleIDAuth" value="' . mt_rand(5, 200) . '">
-            <input type="hidden" id="Code action" class="SingleIDAuth" value="' . mt_rand(500, 20000) . '">
+            <input type="hidden" id="Date" class="SingleIDAuth" value="' . $today . '">
+            <input type="hidden" id="IP" class="SingleIDAuth" value="' . $ip . '">
 
             <div class="white_back_single_id singleid_invisible">
                 <input class="singleid_styled_input" name="SingleID" type="text" value="" maxlength="8" />
@@ -1275,5 +1233,29 @@ function singleid_random_chars($length) {
     }
     
     return bin2hex($Bytes);
+}
+
+function singleid_check_ssl() {
+	
+	if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) { // needed for cloudflare flexible ssl
+        $root .= $_SERVER['HTTP_X_FORWARDED_PROTO'] . '://';
+    } else {
+        $root .= !empty($_SERVER['HTTPS']) ? "https://" : "http://";
+    }
+    
+    if ($root == 'https://') {
+        $ssl = 1;
+    } else {
+        $ssl = 0;
+    }
+    
+    $protocol[1] = 'https';
+    $protocol[0] = 'http';
+    
+    if (($ssl == 0) and (get_option('singleid_requested_data') <> '1')) { // { will be blocked ALSO server side }
+        error_log('SSL needed! ' . $ssl);
+        // DEBUG ONLY // wp_die('SSL Misconfiguration');
+    }
+    
 }
 
