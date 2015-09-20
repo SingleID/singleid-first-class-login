@@ -1,26 +1,27 @@
 <?php
 /**
  * Plugin Name: SingleID First-class Login Experience
- * Plugin URI: http://www.singleid.com
+ * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
  * Version: 0.9
  * Author: Daniele Vantaggiato
- * Author URI: http://www.vantax.eu
+ * Author URI: http://www.singleid.com
  * License: GPL2
- 
- SingleID First-class Login Experience is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 2 of the License, or
- any later version.
- 
- SingleID First-class Login Experience is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU General Public License for more details.
- 
- You should have received a copy of the GNU General Public License
- along with SingleID First-class Login Experience. If not, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html .
- 
+ * 
+ * SingleID First-class Login Experience is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * any later version.
+ * 
+ * SingleID First-class Login Experience is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with SingleID First-class Login Experience.
+ * If not, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+ * 
  */
 
 
@@ -29,22 +30,23 @@ Internal note
 * 
 * get_option
 * handshake GOOD - DO RECHECK
-* ssl check USELESS
-* multisite NOT NOW
 * translation
 * securityfix e doublecheck
-* // R757 TOFIX HERE - l'utente creato non ha questi valori!
-* eliminare righe dalla memoria del db!
+* clean memory table!
 
 Functions needed
 * add new user 			( handshake and authorization )
-* 	if username already exist?
+* if username already exist?
 * forgot user password 	( example if user is locked out)
 * edit existing user 	( handshake and authorization )
 * removing SingleID from user
 * removing user from DB
-* update profile infos at every login?
-*
+* 
+* 
+* Future features
+* update profile infos at every login? only optionally
+* multisite
+* 
 Internal note
 Think cases for GAE e STE.
 * 
@@ -56,7 +58,7 @@ Think cases for GAE e STE.
 
 defined('ABSPATH') or die('No script kiddies');
 
-define( 'WP_DEBUG', true );
+define( 'WP_DEBUG', true ); // only for debugging purposes
 
 define('SINGLEID_SERVER_URL', 'https://app.singleid.com/');
 define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', '1234567890'); // get_option('singleid_tmp_password_for_auth'));
@@ -75,11 +77,8 @@ function singleid_fcl_install() {
         error_log('Not yet tested on multisite (2015-09-16)');
     }
     
-    
     global $wpdb;
     global $singleid_fcl_db_version;
-    
-    
     
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
     // Please note the memory engine!
@@ -107,22 +106,24 @@ function singleid_fcl_install() {
     
     
     
+
     
     
     
+    //$sitename = get_bloginfo('name') . ' ' . get_bloginfo('description');
     
-    $sitename = get_bloginfo('name') . ' ' . get_bloginfo('description');
     
+    //$logo_url = get_bloginfo('template_directory') . '/images/logo.jpg';
     
-    $logo_url = get_bloginfo('template_directory') . '/images/logo.jpg';
-    
-    add_option('singleid_logo_url', $logo_url, '', 'yes'); 	// WHY!!! not on https!
+    //add_option('singleid_logo_url', $logo_url, '', 'yes'); 	// WHY!!! not on https!
     
     $tmp_password_for_auth = singleid_random_chars(16);
     add_option('singleid_tmp_password_for_auth', $tmp_password_for_auth, '', 'yes');
     
     $random_install_key = singleid_random_chars(16);
     add_option('singleid_random_install_key', $random_install_key, '', 'yes');
+    
+  
     
 }
 
@@ -258,15 +259,17 @@ function singleid_add_new_admin_action($who) {
     global $wpdb;
     // creating new user and requesting a first handshake to the device
     
-    if (singleid_is_SingleID($who)){
+    if (singleid_is_SingleID($who)) {
 		$SingleID = $who;	// when we edit an user
-	}else{
+	} else {
 		$SingleID = $_POST['SingleID'];	//when we add a new user
 	}
     
     error_log('We are creating a first handshake with '.$SingleID);
     
-	singleid_check_ssl();
+	$ssl = singleid_check_ssl();
+	// $protocol[1] = 'https';
+    // $protocol[0] = 'http';
     
     $UTID = singleid_random_chars(16);
     
@@ -465,7 +468,7 @@ function singleid_login_button() {
     
     $path = plugin_dir_url(__FILE__);
     
-    echo singleid_print_login_button(get_option('singleid_LANGUAGE'), get_option('singleid_requested_data'));
+    echo singleid_print_login_button('en', '1,4,5');
     
 }
 
@@ -568,8 +571,9 @@ function singleid_first_class_login_callback() {
     
     
     
-	singleid_check_ssl();
-    
+	$ssl = singleid_check_ssl();
+    // $protocol[1] = 'https';
+    // $protocol[0] = 'http';
     
     
     $title_name = get_bloginfo('name') . ' ' . get_bloginfo('description');
@@ -592,7 +596,7 @@ function singleid_first_class_login_callback() {
         'name' => 'debug ' . $title_name, // website name
         'requested_data' => '1,4,6',
         'ssl' => $ssl,
-        'url_waiting_data' => $protocol[$ssl] . '://' . $_SERVER['HTTP_HOST'] . $_SERVER["REQUEST_URI"],
+        'url_waiting_data' => admin_url('admin-ajax.php'),
         'ACTION_ID' => 'askfordata'
     );
     
@@ -742,6 +746,9 @@ function singleid_wp_hook_callback() { // here we handle replies from App
             // we must add a new user on wordpress with the data sent from the device
             
             // wordpress needs: username, email, first name, lastname, website, password(hahaha)
+            
+            // We must recognize from the SingleID if the user is already existent ( update only needed) or we have to create a new one
+            
             // we grab from the SingleID value
             // Pers_first_name, Pers_first_email, Pers_last_name,  
             
@@ -751,10 +758,9 @@ function singleid_wp_hook_callback() { // here we handle replies from App
             
             $user_id = username_exists($user_name);
             if (!$user_id and email_exists($user_email) == false) {
-                $random_password = wp_generate_password($length = 24, $include_standard_special_chars = false); // this is a very complex password that the user should never use!
+                $random_password = wp_generate_password($length = 24, $include_standard_special_chars = true); // this is a very complex password that the user should never use!
                 // btw if the user loose his device can use the forgot password method to recover access
                 $user_id         = wp_create_user($user_name, $random_password, $user_email);
-                
                 
                 // Set the nickname
                 wp_update_user(array(
@@ -960,7 +966,7 @@ function singleid_allow_programmatic_login($user, $username, $password) {
 
 
 
-function singleid_print_login_button($language = 'en', $requested_data = '1') {
+function singleid_print_login_button($language = 'en', $requested_data = '1,4,5') {
     
     
     $label['en']['1']        = 'Login with';
@@ -1004,6 +1010,7 @@ function singleid_print_login_button($language = 'en', $requested_data = '1') {
 
 // Delete db table when deactivate
 function singleid_plugin_remove_db() {
+	
     global $wpdb;
     
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
@@ -1011,7 +1018,6 @@ function singleid_plugin_remove_db() {
     $wpdb->query($sql);
     
     delete_option("singleid_fcl_db_version");
-    
     
     $meta_type  = 'user';
     $user_id    = 0; // This will be ignored, since we are deleting for all users.
@@ -1029,7 +1035,8 @@ function singleid_plugin_remove_db() {
     
     delete_metadata($meta_type, $user_id, $meta_key, $meta_value, $delete_all);
     
-    
+    delete_option( 'singleid_tmp_password_for_auth' );	
+    delete_option( 'singleid_random_install_key' );		// why not? 
     
 }
 register_deactivation_hook(__FILE__, 'singleid_plugin_remove_db');
@@ -1044,8 +1051,10 @@ register_deactivation_hook(__FILE__, 'singleid_plugin_remove_db');
 add_action('admin_menu', 'singleid_options_add_pages');
 
 function singleid_options_add_pages() {
+	
     add_options_page('SingleID Options', 'SingleID Options', 'manage_options', 'simple-options-example', 'SingleID_options_page');
     register_setting('SingleID_options', 'SingleID_options');
+    
 }
 
 
@@ -1142,7 +1151,10 @@ function singleid_options_page() {
 register_uninstall_hook(__FILE__, 'singleid_delete_simple_options');
 
 function singleid_delete_simple_options() {
-    delete_option('SingleID_options');
+	
+    delete_option( 'SingleID_options' );
+    delete_option( 'singleid_random_install_key' );
+    
 }
 
 
@@ -1172,7 +1184,9 @@ function singleid_gimme_visitor_ip() {
 
 function singleid_send_request_to_singleid_server($fields, $fields_string) {
     
-    
+    // sometimes we have to remove older entries from DB!
+    // and then...
+    // ALTER TABLE my_table ENGINE=MEMORY;
     
     
     $ip = singleid_gimme_visitor_ip();
@@ -1249,13 +1263,14 @@ function singleid_check_ssl() {
         $ssl = 0;
     }
     
-    $protocol[1] = 'https';
-    $protocol[0] = 'http';
+    
     
     if (($ssl == 0) and (get_option('singleid_requested_data') <> '1')) { // { will be blocked ALSO server side }
         error_log('SSL needed! ' . $ssl);
         // DEBUG ONLY // wp_die('SSL Misconfiguration');
     }
+    
+    return $ssl;
     
 }
 
