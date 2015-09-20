@@ -3,8 +3,8 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 0.9
- * Author: Daniele Vantaggiato
+ * Version: 1.0
+ * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
  * License: GPL2
  * 
@@ -29,26 +29,22 @@
 Internal note
 * 
 * get_option
-* handshake GOOD - DO RECHECK
 * translation
 * securityfix e doublecheck
 * clean memory table!
 
 Functions needed
 * add new user 			( handshake and authorization )
-* if username already exist?
-* forgot user password 	( example if user is locked out)
 * edit existing user 	( handshake and authorization )
 * removing SingleID from user
 * removing user from DB
 * 
 * 
 * Future features
+* possibility to associate than one SingleID to login with a specific user
 * update profile infos at every login? only optionally
-* multisite
-* 
-Internal note
-Think cases for GAE e STE.
+* multisite testing
+* Better handling this cas: username already exist? 
 * 
 
 */
@@ -61,27 +57,63 @@ defined('ABSPATH') or die('No script kiddies');
 define( 'WP_DEBUG', true ); // only for debugging purposes
 
 define('SINGLEID_SERVER_URL', 'https://app.singleid.com/');
-define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', '1234567890'); // get_option('singleid_tmp_password_for_auth'));
-
+define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', get_option('singleid_tmp_password_for_auth'));
+															// this temporary encryption makes no sense because the idea does his job (defending users' privacy against DB dump) only if this temporary password is NOT stored on the same DB.
+															// So it's here only as cross compatibility with the main plugin specs and maybe will be removed asap.
 
 global $singleid_fcl_db_version;
 
-$singleid_fcl_db_version = '0.9';
+$singleid_fcl_db_version = '1.0';
 
-add_filter('allowed_http_origin', '__return_true'); // needed for allowing post data from the user's App
+add_filter( 'allowed_http_origin', '__return_true' ); // needed for allowing post data from the user's App
 
+add_filter( 'plugin_row_meta', 'singleid_custom_plugin_row_meta', 10, 2 );
+
+function singleid_custom_plugin_row_meta( $links, $file ) {
+
+	if ( strpos( $file, 'singleid-first-class-login.php' ) !== false ) {
+		$links[] = '<a href="options-general.php?page=singleid-options">Settings</a>';
+		$links[] = '<a href="https://github.com/SingleID/singleid-first-class-login/blob/master/UserFaq.md">User FAQ</a>';
+	}
+	
+	return $links;
+}
 
 function singleid_fcl_install() {
+	
+	
+	//Check minimum PHP requirements, which is 5.3.3 at the moment.
+	if (version_compare(PHP_VERSION, "5.3.3", "<")) {
+		add_action('admin_notices', 'singleid_AddPhpVersionError');
+		$fail = true;
+	}
+
+	//Check minimum WP requirements, which is 3.3 at the moment.
+	if (version_compare($GLOBALS["wp_version"], "3.3", "<")) {
+		add_action('admin_notices', 'singleid_AddWpVersionError');
+		$fail = true;
+	}
+	
     
     if (is_multisite()) {
         error_log('Not yet tested on multisite (2015-09-16)');
+        add_action('admin_notices', 'singleid_AddWpMultiError');
+		$fail = true;
     }
+    
+    
+    
+    if ($fail) {
+		wp_die('Sorry. You Wordpress is not compatible!');
+	}
+	
     
     global $wpdb;
     global $singleid_fcl_db_version;
     
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
-    // Please note the memory engine!
+    // Please note the memory engine! We doens't need to store permanently these data.
+    // The login behind is that a full DB dump should not help an hacker to log as a registered user
     
     $sql = "CREATE TABLE IF NOT EXISTS $table_data (
 	  `SingleID` char(8) COLLATE utf8_unicode_ci NOT NULL,
@@ -94,6 +126,7 @@ function singleid_fcl_install() {
 	  `rawdata_received` varchar(8000) COLLATE utf8_unicode_ci NOT NULL,
 	  `encrypted_data` varchar(8000) COLLATE utf8_unicode_ci NOT NULL,
 	  `sending_ip` varchar(60) COLLATE utf8_unicode_ci NOT NULL,
+	  `WpUserId` INT( 11 ) UNSIGNED NOT NULL,
 	  UNIQUE KEY `bcrypted_UTID` (`bcrypted_UTID`),
 	  KEY `UTID` (`UTID`)
 	) ENGINE=MEMORY DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
@@ -104,26 +137,12 @@ function singleid_fcl_install() {
     
     add_option('singleid_fcl_db_version', $singleid_fcl_db_version);
     
-    
-    
-
-    
-    
-    
-    //$sitename = get_bloginfo('name') . ' ' . get_bloginfo('description');
-    
-    
-    //$logo_url = get_bloginfo('template_directory') . '/images/logo.jpg';
-    
-    //add_option('singleid_logo_url', $logo_url, '', 'yes'); 	// WHY!!! not on https!
-    
     $tmp_password_for_auth = singleid_random_chars(16);
     add_option('singleid_tmp_password_for_auth', $tmp_password_for_auth, '', 'yes');
     
     $random_install_key = singleid_random_chars(16);
     add_option('singleid_random_install_key', $random_install_key, '', 'yes');
     
-  
     
 }
 
@@ -137,6 +156,7 @@ function singleid_hide_buttons() {
     if ($current_screen->id == 'users') {
         echo '<style>.add-new-h2{display: none;}</style>'; 
     }
+    
 }
 add_action('admin_head', 'singleid_hide_buttons');
 
@@ -158,7 +178,7 @@ function singleid_add_users_page() {
         , 'add_new_singleid_user', 'singleid_render_users_page');
     
     
-    remove_submenu_page('users.php', 'user-new.php'); // TODO - triple check about privileges!
+    remove_submenu_page('users.php', 'user-new.php'); // be careful about privileges!
     
     
 }
@@ -255,7 +275,7 @@ function singleid_render_users_page() {
 
 
 add_action('admin_action_singleid_add_new', 'singleid_add_new_admin_action');
-function singleid_add_new_admin_action($who) {
+function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     global $wpdb;
     // creating new user and requesting a first handshake to the device
     
@@ -268,8 +288,6 @@ function singleid_add_new_admin_action($who) {
     error_log('We are creating a first handshake with '.$SingleID);
     
 	$ssl = singleid_check_ssl();
-	// $protocol[1] = 'https';
-    // $protocol[0] = 'http';
     
     $UTID = singleid_random_chars(16);
     
@@ -290,7 +308,8 @@ function singleid_add_new_admin_action($who) {
         'start_ip' => singleid_gimme_visitor_ip(),
         'bcrypted_UTID' => $UTID_bcrypted,
         'right_now' => time(),
-        'role' => $_POST['role']
+        'role' => $_POST['role'],
+        'WpUserId' => $existing_user_id
     ));
     
     
@@ -338,12 +357,6 @@ function singleid_add_new_admin_action($who) {
     
     
     
-    
-    
-    
-    
-    
-    
     wp_redirect($_SERVER['HTTP_REFERER']);
     exit();
 }
@@ -378,12 +391,12 @@ function singleid_custom_user_profile_fields($user) {  // -> check also singleid
         </tr>
     </table>
     
-    
 <?php
 }
+
+
 add_action('show_user_profile', 'singleid_custom_user_profile_fields');
 add_action('edit_user_profile', 'singleid_custom_user_profile_fields');
-// add_action( 'user_new_form_tag', 'singleid_custom_user_profile_fields' );
 add_action('user_new_form_tag', 'singleid_do_not_use_this_page');
 
 
@@ -394,9 +407,7 @@ function singleid_save_custom_user_profile_fields($user_id) {
     
     
     error_log('regarding this user: '.$user_id);
-    // check if this usermeta is now different
-    
-    // if yes delete the saved handshake
+    // check if this usermeta is now different if yes delete the saved handshake
     $current_singleid = esc_attr(get_the_author_meta('SingleID', $user_id));
     
     
@@ -420,7 +431,7 @@ function singleid_save_custom_user_profile_fields($user_id) {
 			
 			if (singleid_is_SingleID($_POST['SingleID'])){	// needed to avoid fake request also "null" value
 			
-				singleid_add_new_admin_action($_POST['SingleID']);
+				singleid_add_new_admin_action($_POST['SingleID'], $user_id); // is an update of an existing user!
 			
 			}
 		}
@@ -552,7 +563,7 @@ function singleid_first_class_login_callback() {
     
     $UTID_bcrypted = password_hash($UTID, PASSWORD_BCRYPT, $options);
 	
-	error_log('saved enc action' . $encrypted_secret_string);
+	//error_log('saved enc action' . $encrypted_secret_string);
     
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
     
@@ -582,9 +593,8 @@ function singleid_first_class_login_callback() {
         $title_name = get_bloginfo('wpurl');
     }
     
-    error_log('Title name should be ' . $title_name);
+    //error_log('Title name should be ' . $title_name);
     
-    // TODO check is an already paired devices?
     
     //set POST variables
     $fields_string = '';
@@ -593,7 +603,7 @@ function singleid_first_class_login_callback() {
         'SingleID' => $_POST['single_id'], // the value typed in the button ( 8 hex char string )
         'UTID' => $UTID, // MUST BE AN MD5 HASH or a 32 hex char string
         'logo_url' => 'http://www.vantax.eu/index3_files/697933-0-android.png', // get_option( 'singleid_logo_url'), // the img that will be displayed on the user device
-        'name' => 'debug ' . $title_name, // website name
+        'name' => $title_name, // website name
         'requested_data' => '1,4,6',
         'ssl' => $ssl,
         'url_waiting_data' => admin_url('admin-ajax.php'),
@@ -643,7 +653,7 @@ function singleid_first_class_login_refresh_callback() { 	// browser is waiting 
     
     // Check if is a valid bcrypt with cost between 12 and 19
     if (!singleid_is_bcrypt($_POST['bcryptutid'])) {
-        error_log($_POST['bcryptutid']);
+        // error_log($_POST['bcryptutid']);
         wp_die('501');
     }
     
@@ -673,7 +683,6 @@ function singleid_first_class_login_refresh_callback() { 	// browser is waiting 
             } else {
                 $userlogin = $user->user_login;
             }
-            
             
             singleid_programmatic_login($userlogin);
             
@@ -709,7 +718,6 @@ function singleid_first_class_login_refresh_callback() { 	// browser is waiting 
 add_action('wp_ajax_nopriv_wp_hook', 'singleid_wp_hook_callback'); 
 
 function singleid_wp_hook_callback() { // here we handle replies from App
-    error_log('TRAQQQQQ-001');
     global $wpdb;
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
     // first we should check if is replying to a recent requests
@@ -719,26 +727,24 @@ function singleid_wp_hook_callback() { // here we handle replies from App
     // if not we have to create a random value
     
     if ((singleid_is_SingleID($_POST['SingleID'])) and (!isset($_POST['SharedSecret']))) {
-	error_log('TRAQQQQQ-002');
-        // This is the reply to the 1,4,5 handshake requests.
         
+        // This is the reply to the 1,4,5 handshake requests.
         // so we need to check if the hash is correct ( and in how many hours? )
         // Check if is a valid bcrypt with cost between 12 and 19
+        
         if (!singleid_is_md5($_POST['UTID'])) {
             error_log($_POST['UTID']);
             wp_die('501');
         }
         
         
-        // TODO MITM HERE IS POSSIBLE?	
+        // A MITM HERE IS POSSIBLE?	
         // Surely if recipient do not use SSL
         // If SSL is enabled is much more complicated and it involve to hack at least two devices (to explain)
         // BY THE WAY the admin of wordpress should check the received data... 
         
         $sql = "SELECT * FROM $table_data WHERE UTID = '" . md5($_POST['UTID']) . "' AND SingleID = '" . $_POST['SingleID'] . "' ORDER BY right_now DESC LIMIT 1";
         $result = $wpdb->get_row($sql) or die(mysql_error());
-        
-        error_log('recovered from DB' . serialize($result));
         
         if (password_verify($_POST['UTID'], $result->bcrypted_UTID)) {
             // TODO in case of same email?!!?!?! now display ko! 2015-09-09
@@ -755,72 +761,93 @@ function singleid_wp_hook_callback() { // here we handle replies from App
             $user_name  = $_POST['Pers_first_name'] . ' ' . $_POST['Pers_last_name'];
             $user_email = $_POST['Pers_first_email'];
             
-            
-            $user_id = username_exists($user_name);
-            if (!$user_id and email_exists($user_email) == false) {
-                $random_password = wp_generate_password($length = 24, $include_standard_special_chars = true); // this is a very complex password that the user should never use!
-                // btw if the user loose his device can use the forgot password method to recover access
-                $user_id         = wp_create_user($user_name, $random_password, $user_email);
-                
-                // Set the nickname
-                wp_update_user(array(
-                    'ID' => $user_id,
-                    'nickname' => $_POST['Pers_first_name']
-                ));
-                
-                // Set the role
-                $user = new WP_User($user_id);
-                $user->set_role($result->role);
-                
-                
-                $shared_secret = singleid_random_chars(16);
-                
-                $options = Array(
-                    'cost' => 13
-                );
-                
-                $shared_secret_bcrypted = password_hash($shared_secret, PASSWORD_BCRYPT, $options);
-                
-                // TOFIX HERE - l'utente creato non ha questi valori!
-                update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
-                update_usermeta($user_id, 'SingleID_paired', $shared_secret_bcrypted);
-                
-                // we need to reply with a secret password
-                // we need to save the hashed password into the meta of the users
-                
-                wp_die($shared_secret); // the device will store this for any future communications!
-                
-                
-            } else {
-                $random_password = __('User already exists.  Password inherited.');
-            }
-            
-            
-            
-            
+			$random_password = wp_generate_password($length = 24, $include_standard_special_chars = true);
+			// this is a very complex password that the user should never use!
+			// btw if the user loose his device can use the forgot password method to recover access
+					
+					
+					
+            if ($result->WpUserId == 0) {	// is a request to create a new user!
+				
+				$user_id = username_exists($user_name);
+				
+				if (!$user_id and email_exists($user_email) == false) {
+					
+					// we need to create a new user or we are updating an existing one?
+					
+					$user_id         = wp_create_user($user_name, $random_password, $user_email);
+					
+					// Set the nickname with the data grabbed from the device
+					wp_update_user(array(
+						'ID' => $user_id,
+						'nickname' => $_POST['Pers_first_name']
+					));
+					
+					// Set the role
+					$user = new WP_User($user_id);
+					$user->set_role($result->role);
+				
+					
+					$shared_secret = singleid_random_chars(16);
+					
+					$options = Array(
+						'cost' => 13
+					);
+					
+					$shared_secret_bcrypted = password_hash($shared_secret, PASSWORD_BCRYPT, $options);
+					
+					// TOFIX HERE - l'utente creato non ha questi valori!
+					update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
+					update_usermeta($user_id, 'SingleID_paired', $shared_secret_bcrypted);
+					
+					// we need to reply with a secret password
+					// we need to save the hashed password into the meta of the users
+					
+					wp_die($shared_secret); // the device will store this for any future communications!
+					
+					
+				} else {
+					$random_password = __('User already exists.  Password inherited.');
+				}
+			} elseif ($result->WpUserId > 0) { // is an update of an existing wordpress user
+				
+				
+					wp_set_password( $random_password, $result->WpUserId ); // we replace the old user password
+																			
+					$shared_secret = singleid_random_chars(16);
+					
+					$options = Array(
+						'cost' => 13
+					);
+					
+					$shared_secret_bcrypted = password_hash($shared_secret, PASSWORD_BCRYPT, $options);
+					
+					update_usermeta($result->WpUserId, 'SingleID', $_POST['SingleID']);
+					update_usermeta($result->WpUserId, 'SingleID_paired', $shared_secret_bcrypted);
+					
+					// we need to reply with a secret password
+					// we need to save the hashed password into the meta of the users
+					
+					wp_die($shared_secret); // the device will store this for any future communications!
+				
+				
+			}
             
             
             
         } else {
-            wp_die('ko');
+            wp_die('ko'); // the hash returned from the device is not so good as we expect ;-)
         }
         
         
-        
-        // we need to create a token because this is the first handshake for a sensitive account
-        
-        // error_log(serialize($_POST));
         wp_die(md5($_POST['SingleID']));
     }
     
     
     
-    error_log('TRAQQQQQ-003');
     if (singleid_is_md5($_POST['SharedSecret'])) {
-	error_log('TRAQQQQQ-004');
         // This is the first reply to a 1,4,6 request.
-        error_log('This is the first reply to a 1,4,6 request');
-        error_log('dati ricevuti ' . serialize($_POST));
+        // error_log('dati ricevuti ' . serialize($_POST));
         // the smartphone is asking which operation I am authorizing right now? 
         $sql = "SELECT * FROM $table_data WHERE UTID = '" . $_POST['UTID'] . "' AND SingleID = '" . $_POST['SingleID'] ."' ORDER BY right_now DESC LIMIT 1"; // TODO order by not needed
         $result = $wpdb->get_row($sql) or die(mysql_error());
@@ -843,9 +870,10 @@ function singleid_wp_hook_callback() { // here we handle replies from App
         
         if (password_verify($_POST['SharedSecret'], $user_paired_value)) {
             // the smartphone has given "prove" to know the uncrypted value of the bcrypt ( singleid_paired )
+            // TODO this is not really secure because the data are knowable from an attacker
+            
             require('lib/GibberishAES.php');
             $decrypted_data = GibberishAES::dec($encdata, SINGLEID_DEFINED_ENCRYPTED_RANDOM);
-            error_log('decrypted: '.$decrypted_data);
             // here we re-encrypt the data with the client key if the hash is correct !
             
             GibberishAES::size(256); // Also 192, 128
@@ -1052,7 +1080,7 @@ add_action('admin_menu', 'singleid_options_add_pages');
 
 function singleid_options_add_pages() {
 	
-    add_options_page('SingleID Options', 'SingleID Options', 'manage_options', 'simple-options-example', 'SingleID_options_page');
+    add_options_page('SingleID Options', 'SingleID Options', 'manage_options', 'singleid-options', 'SingleID_options_page');
     register_setting('SingleID_options', 'SingleID_options');
     
 }
@@ -1090,7 +1118,7 @@ function singleid_options_page() {
     _e('SingleID Options');
 ?></h2>
 		
-		<h4>More option will be added. Do your requests on github </h4>
+		<h4>More option will be added. Do your requests on <a href="https://github.com/SingleID/singleid-first-class-login">github</a> </h4>
 
 		<table class="form-table">
 		
@@ -1111,10 +1139,10 @@ function singleid_options_page() {
 					</label></p>
 				</td>
 			</tr>
-			
+	<!--		
 			<tr>
 				<th scope="row"><?php
-    _e('Allow login only if smartphone using the same network of the browser');
+    _e('Allow login only if smartphone is using the same network of the browser');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1127,7 +1155,7 @@ function singleid_options_page() {
 					</label></p>
 				</td>
 			</tr>
-						
+	-->		
 
 		</table>
 		
@@ -1273,4 +1301,35 @@ function singleid_check_ssl() {
     return $ssl;
     
 }
+
+
+
+
+
+/**
+ * Adds a notice to the admin interface that the WordPress version is too old for the plugin
+ *
+ */
+function singleid_AddWpVersionError() {
+	echo "<div id='sm-version-error' class='error fade'><p><strong>" . __('Your WordPress version is too old for SingleID plugin.', 'singleid-first-class-login') . "</strong><br /> " . sprintf(__('Unfortunately this release of SingleID plugin requires at least WordPress %4$s. You are using Wordpress %2$s, which is out-dated and insecure. Please upgrade or go to <a href="%1$s">active plugins</a> and deactivate the SingleID plugin to hide this message.', 'singleid-first-class-login'), "plugins.php?plugin_status=active", $GLOBALS["wp_version"], "https://www.singleid.com/","3.3") . "</p></div>";
+}
+
+/**
+ * Adds a notice to the admin interface that the WordPress version is too old for the plugin
+ *
+ */
+function singleid_AddPhpVersionError() {
+	echo "<div id='sm-version-error' class='error fade'><p><strong>" . __('Your PHP version is too old for SingleID plugin.', 'singleid-first-class-login') . "</strong><br /> " . sprintf(__('Unfortunately this release of SingleID plugin requires at least PHP %4$s. You are using PHP %2$s, which is out-dated and insecure. Please ask your web host to update your PHP installation', 'singleid-first-class-login'), "plugins.php?plugin_status=active", PHP_VERSION, "https://www.singleid.com/","5.3.3") . "</p></div>";
+}
+
+/**
+ * Adds a notice to the admin interface that the WordPress multisite is not yet tested
+ *
+ */
+function singleid_AddWpMultiError() {
+	echo "<div id='sm-version-error' class='error fade'><p><strong>" . __('Multisite wordpress is not yet tested for SingleID plugin.', 'singleid-first-class-login') . "</strong><br /> Unfortunately this release of SingleID plugin is not yet tested for a multisite wordpress</p></div>";
+}
+
+
+
 
