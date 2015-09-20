@@ -1,6 +1,24 @@
-/*
- * SingleID plugin for Wordpress without SSL -> https://github.com/SingleID/wordpress-plugin/
+/**
+ * Plugin Name: SingleID First-class Login Experience
+ * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
+ * Description: Enjoy the first-class login experience for your wordpress backoffice
+ * Author: SingleID Inc.
+ * Author URI: http://www.singleid.com
+ * License: GPL2
  * 
+ * SingleID First-class Login Experience is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * any later version.
+ * 
+ * SingleID First-class Login Experience is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with SingleID First-class Login Experience.
+ * If not, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
  * 
  */
  
@@ -16,16 +34,15 @@ function sid_sendData()
 
 	
 	var single_id = jQuery('input[name="SingleID"]').val();
-	console.log('single_id: '+single_id);
 
 		// we need to create a string with all the field with SingleIDAuth class -> 2015-03-25 -> To put in white-paper
+		// this is not the best security option but this is a fork of the generic plugin. Will be improved soon.
 		var AuthArray = {};
 		
 		$(jQuery('.SingleIDAuth')).each(function() {
 			AuthArray[$(this).attr('id')] = $(this).val();
 		});
 		var AuthString = JSON.stringify(AuthArray);
-		// console.log(AuthString);
 		
 	if(single_id)
 	{
@@ -37,16 +54,14 @@ function sid_sendData()
 								op: 'send'
 								}, function(response) {
 		
-		console.log('Got this from the server: ' + response);
+		//console.log('Got this from the server: ' + response);
 		
 		
 		if (isNaN(response)) {
-			// console.log('isNaN true');
 			clearInterval(singleIDInterval);
 			jQuery('.singleid_waiting').html(response);
 		}else{
 			singleIDInterval = setInterval(sid_refresh, 2000);
-			// console.log('isNaN false');
 		}
 		
 		});
@@ -60,7 +75,7 @@ function sid_sendData()
 
 function sid_refresh()
 {
-	console.log('refreshed!');
+	console.log('Waiting for reply from device!');
 	var bcry = jQuery.cookie("bcry");
 	
 	jQuery.post(ajaxurl, {action: 'first_class_login_refresh', bcryptutid: bcry}, function(data) {
@@ -94,7 +109,7 @@ function sid_refresh()
 			jQuery(".singleid_waiting").fadeOut(500);
 		}else if(res == 100){
 			// continue loop!!!
-			// the php will take care to stop after 3 minutes
+			// the php will take care to stop this after 3 minutes
 		}else{
 			console.log('no corresponding action found in refresh');
 			clearInterval(singleIDInterval);
