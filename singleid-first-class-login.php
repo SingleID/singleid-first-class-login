@@ -10,8 +10,7 @@
  * 
  * SingleID First-class Login Experience is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * any later version.
+ * the Free Software Foundation, either version 2 of the License, or any later version.
  * 
  * SingleID First-class Login Experience is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,6 +25,9 @@
 
 
 /* Internal note
+* add new translation !
+* comaptibility check
+* 
 * 
 * 
 * Future features
@@ -43,12 +45,13 @@
 
 defined('ABSPATH') or die('No script kiddies');
 
-define( 'WP_DEBUG', true ); // only for debugging purposes
+define( 'WP_DEBUG', false ); // only for debugging purposes
 
 define('SINGLEID_SERVER_URL', 'https://app.singleid.com/');
 define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', get_option('singleid_tmp_password_for_auth'));
 															// this temporary encryption makes no sense because the idea does his job (defending users' privacy against DB dump) only if this temporary password is NOT stored on the same DB.
 															// So it's here only as cross compatibility with the main plugin specs and maybe will be removed asap.
+require('lib/password.php'); // needed for php =< 5.5 but >= 5.3.3
 
 global $singleid_fcl_db_version;
 
@@ -312,7 +315,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     // $logo_desiderato = get_option( 'singleid_logo_url');
     // error_log('logo desiderato ->: '.$logo_desiderato);
     
-    $logo_url = get_bloginfo( 'template_directory' ) .'/images/logo.jpg';
+    // $logo_url = get_bloginfo( 'template_directory' ) .'/images/logo.jpg';
     
     //set POST variables
     $fields_string = '';
@@ -320,7 +323,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     $fields        = array(
         'SingleID' => $SingleID, // the value typed in the button ( 8 hex char string )
         'UTID' => $UTID, // MUST BE AN MD5 HASH or a 32 hex char string
-        'logo_url' => $logo_url, // the img that will be displayed on the user device
+        'logo_url' => 'http://singleid.com/wp-content/themes/singleid/img/logonew.png', // get_option( 'singleid_logo_url'), // the img that will be displayed on the user device
         'name' => 'handshake:' . $title_name, // website name
         'requested_data' => '1,4,5',
         'ssl' => $ssl,
