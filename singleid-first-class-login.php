@@ -3,11 +3,15 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 1.1
+ * Version: 1.1.3
  * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
  * Text Domain: singleid-first-class-login
  * License: GPL2
+ * 
+ * 
+ * © Daniele Vantaggiato 2015
+ * 
  * 
  * SingleID First-class Login Experience is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +61,10 @@ $singleid_fcl_db_version = '1.0';
 
 add_filter( 'allowed_http_origin', '__return_true' ); // needed for allowing post data from the user's App
 
-
+	//Check PHP password_hash function!
+	if (version_compare(PHP_VERSION, "5.3.7", "<")) {
+		require('lib/password.php'); // needed *only* for php =< 5.3.7 but >= 5.3.3
+	}
 
 
 add_action('plugins_loaded', 'singleid_load_textdomain');
@@ -90,11 +97,6 @@ function singleid_fcl_install() {
 		$fail = true;
 	}
 	
-	//Check PHP password_hash function!
-	if (version_compare(PHP_VERSION, "5.3.7", "<")) {
-		require('lib/password.php'); // needed *only* for php =< 5.3.7 but >= 5.3.3
-	}
-
 	//Check minimum WP requirements, which is 3.3 at the moment.
 	if (version_compare($GLOBALS["wp_version"], "3.3", "<")) {
 		add_action('admin_notices', 'singleid_AddWpVersionError');
@@ -159,8 +161,12 @@ function singleid_hide_buttons() {
 	// this should be optional in a future release of this plugin
     global $current_screen;
     
-    if ($current_screen->id == 'users') {
+    if (($current_screen->id == 'users') or ($current_screen->id == 'user-edit')){
         echo '<style>.add-new-h2{display: none;}</style>'; 
+    }
+    
+    if (($current_screen->id == 'profile') or ($current_screen->id == 'user-edit')) {
+        echo '<style>#password{display: none;}.user-pass2-wrap{display: none;}</style>'; 
     }
     
 }
@@ -299,15 +305,16 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
 		$SingleID = $_POST['SingleID'];	// when we add a new user
 	}
 	
-	
-	$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
-				
-	if ($existent <> 0) { // there are no users with this SingleID associated
-	
-		wp_redirect($_SERVER['HTTP_REFERER'].'&error=1');
-		exit();
-    				
-    }
+	if ($existing_user_id == 0){	// in this case this check is already done!!!
+		$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
+					
+		if ($existent <> 0) { // there are users with this SingleID associated!
+		
+			wp_redirect($_SERVER['HTTP_REFERER'].'&error=1');
+			exit();
+						
+		}
+	}
 	$ssl = singleid_check_ssl();
     
     $UTID = singleid_random_chars(16);
@@ -341,9 +348,12 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     }
     
     // $logo_desiderato = get_option( 'singleid_logo_url');
-    // error_log('logo desiderato ->: '.$logo_desiderato);
+    // error_log('logo desiderato ->: '.get_template_directory_uri());
     
-    // $logo_url = get_bloginfo( 'template_directory' ) .'/images/logo.jpg';
+    
+    // we try to detect the wordpress url 
+	$logo_url = singleid_give_me_a_suitable_logo();	// UGLY TODO! replace with better code asap
+    
     
     //set POST variables
     $fields_string = '';
@@ -351,7 +361,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     $fields        = array(
         'SingleID' => $SingleID, // the value typed in the button ( 8 hex char string )
         'UTID' => $UTID, // MUST BE AN MD5 HASH or a 32 hex char string
-        'logo_url' => 'http://singleid.com/wp-content/themes/singleid/img/logonew.png', // get_option( 'singleid_logo_url'), // the img that will be displayed on the user device
+        'logo_url' => $logo_url, // the img that will be displayed on the user device
         'name' => $title_name, // website name
         'requested_data' => '1,4,5',
         'ssl' => $ssl,
@@ -428,18 +438,28 @@ function singleid_save_custom_user_profile_fields($user_id) {
 			
 			// if is empty we remove and stop!
 			if (trim($_POST['SingleID']) == '') {
-				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
+				// update_usermeta($user_id, 'SingleID', ''); // it's better to remove?
+				
+				$meta_type  = 'user';
+				$user_id    = $user_id;
+				$meta_key   = 'SingleID_paired';
+				
+				delete_metadata($meta_type, $user_id, $meta_key);
+				
+				$meta_key   = 'SingleID';
+				
+				delete_metadata($meta_type, $user_id, $meta_key);
+				
+    
 			} else {
 			
 				// We need to update SingleID_paired and so we need a new handshake requests
 				
 				// SingleID
-				
 				$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
 				
-				if ($existent == 0) { // check that SingleID are unique into the DB (password-sharing is scheduled for a next release of this plugin)
-				
-				// save *my* custom field
+				if ($existent == 0) { // Check that SingleID are unique into the DB (password-sharing is scheduled for a next release of this plugin)
+					
 				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
 				
 					if (singleid_is_SingleID($_POST['SingleID'])) {	// redundant after previous if
@@ -617,7 +637,8 @@ function singleid_first_class_login_callback() {
         $title_name = get_bloginfo('wpurl');
     }
     
-    
+
+    $logo_url = singleid_give_me_a_suitable_logo();
     
     //set POST variables
     $fields_string = '';
@@ -625,7 +646,7 @@ function singleid_first_class_login_callback() {
     $fields        = array(
         'SingleID' => $_POST['single_id'], 	// the value typed in the button ( 8 hex char string )
         'UTID' => $UTID, 					// MUST BE AN MD5 HASH or a 32 hex char string
-        'logo_url' => 'http://www.vantax.eu/index3_files/697933-0-android.png', // get_option( 'singleid_logo_url'), // the img that will be displayed on the user device
+        'logo_url' => $logo_url, // the img that will be displayed on the user device
         'name' => $title_name,
         'requested_data' => '1,4,6',
         'ssl' => $ssl,
@@ -1045,9 +1066,13 @@ function singleid_print_login_button($language = 'en', $requested_data = '1,4,5'
     
     $plugin_options = get_option('SingleID_options');
     
-    // #nav{display: none;}
+    // 
     if ($plugin_options['avoid_mixed_login'] == 1) {
-		$hideform = '<style>#loginform{display: none;}</style>';
+		$hideform = '
+		<style>
+		#loginform{display: none;}
+		#nav{display: none;}
+		</style>';
 	}
     
     return $hideform. '
@@ -1247,9 +1272,6 @@ function singleid_options_page() {
 <?php
     
     
-    
-    
-    
 }
 
 
@@ -1290,8 +1312,7 @@ function singleid_gimme_visitor_ip() {
 
 function singleid_send_request_to_singleid_server($fields, $fields_string) {
     
-    // sometimes we have to remove older entries from DB!
-    $not_always = rand(1, 30);
+    $not_always = rand(1, 50);	// sometimes we have to remove older entries from DB!
     
     if ($not_always == 1) {
 		global $wpdb;
@@ -1307,7 +1328,7 @@ function singleid_send_request_to_singleid_server($fields, $fields_string) {
     
     $authh = get_option('singleid_random_install_key');
 	// $emailadmin = bloginfo('admin_email');
-    $emailadmin = 'privacy-needed'; // should be opt-in
+    $emailadmin = 'privacy-needed'; // should be opt-in // TODO!
     
     $headers = array(
         'Authorization: ' . $authh,
@@ -1358,8 +1379,9 @@ function singleid_is_bcrypt($val) { // (allow cost from 12 to 19 only)
 function singleid_random_chars($length) {
     
     if (function_exists('openssl_random_pseudo_bytes')) {
-        $Bytes = openssl_random_pseudo_bytes($length, $strong);
+        $Bytes = openssl_random_pseudo_bytes($length, $strong); //It's nice to do this each time
     }
+    
     if ($strong !== true) {
         die('Use PHP >= 5.3 or Mcrypt extension');
     }
@@ -1438,4 +1460,22 @@ function singleid_get_user_by_meta_data( $meta_key, $meta_value ) {
 	$int = $user_query->get_total();
 	return $int;
 
-} // end get_user_by_meta_data
+}
+
+
+
+function singleid_give_me_a_suitable_logo(){
+	// return 'http://singleid.com/wp-content/themes/singleid/img/logonew.png'; // FOR DEBUG PURPOSES ONLY !
+		// UGLY
+		// trying to detect the wordpress url 
+		// TODO! replace with better code asap
+		
+		$logo_url = get_template_directory_uri().'/images/logo.jpg';
+
+		if (!is_array(@getimagesize($logo_url))) {
+			$logo_url = plugin_dir_url( __FILE__ ) . 'css/SingleID/fallback-logo.png'; // be sure that AT LEAST THIS IS AVAILABLE FROM INTERNET!
+		}
+		
+		return $logo_url;
+}
+	
