@@ -3,9 +3,10 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 1.0
+ * Version: 1.1
  * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
+ * Text Domain: singleid-first-class-login
  * License: GPL2
  * 
  * SingleID First-class Login Experience is free software: you can redistribute it and/or modify
@@ -43,7 +44,7 @@
 
 defined('ABSPATH') or die('Please no script kiddies');
 
-define( 'WP_DEBUG', false ); // only for debugging purposes
+// define( 'WP_DEBUG', true ); // only for debugging purposes
 
 define('SINGLEID_SERVER_URL', 'https://app.singleid.com/');	// don't change this
 define('SINGLEID_DEFINED_ENCRYPTED_RANDOM', get_option('singleid_tmp_password_for_auth'));
@@ -56,7 +57,19 @@ $singleid_fcl_db_version = '1.0';
 
 add_filter( 'allowed_http_origin', '__return_true' ); // needed for allowing post data from the user's App
 
+
+
+
+add_action('plugins_loaded', 'singleid_load_textdomain');
+function singleid_load_textdomain() {
+	load_plugin_textdomain( 'singleid-first-class-login', false, dirname( plugin_basename(__FILE__) ) . '/lang/' );
+}
+
+
+
+
 add_filter( 'plugin_row_meta', 'singleid_custom_plugin_row_meta', 10, 2 );
+
 
 function singleid_custom_plugin_row_meta( $links, $file ) {
 
@@ -105,7 +118,7 @@ function singleid_fcl_install() {
     global $singleid_fcl_db_version;
     
     $table_data = $wpdb->prefix . 'SingleID_users_raw_data';
-    // Please note the memory engine! We doens't need to store permanently these data.
+    // Please note the memory engine! We doesn't need to store permanently these data.
     // The login behind is that a full DB dump should not help an hacker to log as a registered user
     
     $sql = "CREATE TABLE IF NOT EXISTS $table_data (
@@ -159,12 +172,13 @@ add_action('admin_head', 'singleid_hide_buttons');
 // Add the admin page
 function singleid_add_users_page() {
     global $current_user;
+    $add_new = __('Add New', 'singleid-first-class-login');
     
     add_users_page(
     // $page_title
         'Your data'
     // $menu_title
-        , 'Add New'
+        , $add_new
     // $capability
         , 'read'
     // $menu_slug
@@ -210,7 +224,7 @@ function singleid_render_users_page() {
 			<td colspan="3">
 			<input type="text" id="SingleID" name="SingleID" value="" />
 			<br /><span class="description"><?php
-    _e('Users will receive an handshake request in order to create an account');
+    _e('Users will receive an handshake request in order to create an account', 'singleid-first-class-login');
 ?></span>
 			</td>
 		</tr>
@@ -218,7 +232,7 @@ function singleid_render_users_page() {
 		
 		<tr class="form-field">
 			<th scope="row"><label for="role"><?php
-    _e('Role');
+    _e('Role', 'singleid-first-class-login');
 ?></label></th>
 			<td><select name="role" id="role">
 				<?php
@@ -234,12 +248,12 @@ function singleid_render_users_page() {
 ?>
 		<tr>
 			<th scope="row"><label for="noconfirmation"><?php
-        _e('Skip Confirmation Email');
+        _e('Skip Confirmation Email', 'singleid-first-class-login');
 ?></label></th>
 			<td><label for="noconfirmation"><input type="checkbox" name="noconfirmation" id="noconfirmation" value="1" <?php
         checked($new_user_ignore_pass);
 ?> /> <?php
-        _e('Add the user without sending an email that requires their confirmation.');
+        _e('Add the user without sending an email that requires their confirmation.', 'singleid-first-class-login');
 ?></label></td>
 		</tr>
 		<?php
@@ -277,7 +291,18 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
 	} else {
 		$SingleID = $_POST['SingleID'];	//when we add a new user
 	}
-    
+	
+	
+	$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
+				
+	if ($existent <> 0) { // there are no users with this SingleID associated
+	
+		// display an error mex in the admin backoffice
+		add_action('admin_notices', 'singleid_admin_notice');				
+		wp_redirect($_SERVER['HTTP_REFERER']);
+		exit();
+    				
+    }
 	$ssl = singleid_check_ssl();
     
     $UTID = singleid_random_chars(16);
@@ -340,8 +365,6 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
         // if you are here means that the SingleID servers are down or misconfigurated
     }
     
-    
-    
     wp_redirect($_SERVER['HTTP_REFERER']);
     exit();
 }
@@ -354,8 +377,8 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
 
 function singleid_do_not_use_this_page($user) {
     
-    echo '<h2>Ops...</h2>
-    <h1>You <i>should</i> use the SingleID Add New User page instead of this!</h1><hr>';
+    _e('<h2>Ops...</h2>
+    <h1>You <i>should</i> use the SingleID Add New User page instead of this!</h1><hr>', 'singleid-first-class-login');
     
 }
 
@@ -405,24 +428,52 @@ function singleid_save_custom_user_profile_fields($user_id) {
 				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
 			} else {
 			
-				// we need to update SingleID_paired and so we need a new handshake requests
-				// prevent more than one SingleID! // TODO !
+				// We need to update SingleID_paired and so we need a new handshake requests
+				
+				// SingleID
+				
+				$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
+				
+				if ($existent == 0) { // there are no users with this SingleID associated
+				
 				// check that SingleID are unique into the DB (password-sharing is scheduled for a next release of this plugin)
 				
 				// save *my* custom field
 				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
 				
-				if (singleid_is_SingleID($_POST['SingleID'])){	// needed to avoid fake request also "null" value
 				
-					singleid_add_new_admin_action($_POST['SingleID'], $user_id); // is an update of an existing user!
+					if (singleid_is_SingleID($_POST['SingleID'])){	// redundant after previous if
+					
+						singleid_add_new_admin_action($_POST['SingleID'], $user_id); // is an update of an existing user!
+					
+					}
 				
+				} else {
+					// display an error mex in the admin backoffice
+					
+
+					add_action('admin_notices', 'singleid_admin_notice');
+
+
 				}
+				
 			}
 			
 		}
     
     
 }
+
+
+
+function singleid_admin_notice() {
+	
+echo '<div class="updated">
+   <p>No user has been updated</p>    
+</div>';    
+
+}
+
 
 add_action('user_register', 'singleid_save_custom_user_profile_fields');
 add_action('personal_options_update', 'singleid_save_custom_user_profile_fields'); 	//for profile page update
@@ -560,7 +611,6 @@ function singleid_first_class_login_callback() {
     // this is needed because the UTID must not be know from the browser as SingleID flow require!
     
     
-    
 	$ssl = singleid_check_ssl();
     
     
@@ -576,10 +626,10 @@ function singleid_first_class_login_callback() {
     $fields_string = '';
     // url encode ?
     $fields        = array(
-        'SingleID' => $_POST['single_id'], // the value typed in the button ( 8 hex char string )
-        'UTID' => $UTID, // MUST BE AN MD5 HASH or a 32 hex char string
+        'SingleID' => $_POST['single_id'], 	// the value typed in the button ( 8 hex char string )
+        'UTID' => $UTID, 					// MUST BE AN MD5 HASH or a 32 hex char string
         'logo_url' => 'http://www.vantax.eu/index3_files/697933-0-android.png', // get_option( 'singleid_logo_url'), // the img that will be displayed on the user device
-        'name' => $title_name, // website name
+        'name' => $title_name,
         'requested_data' => '1,4,6',
         'ssl' => $ssl,
         'url_waiting_data' => admin_url('admin-ajax.php'),
@@ -589,14 +639,13 @@ function singleid_first_class_login_callback() {
     
     
     $fields_string = http_build_query($fields);
-    //error_log($fields_string);
     
     $ServerReply = singleid_send_request_to_singleid_server($fields, $fields_string);
     
     
     if ($ServerReply['Reply'] <> 'ok') {
-        wp_die($ServerReply['PopupTitle']); // hopefully an user should never see this.
-        // if you are here means that the SingleID servers are down or misconfigurated
+        wp_die($ServerReply['PopupTitle']); 	// hopefully an user should never see this.
+												// if you are here means that the SingleID servers are down or misconfigurated
     }
     
     
@@ -777,7 +826,7 @@ function singleid_wp_hook_callback() { // Handling replies from App
 					
 				} else {
 					
-					$random_password = __('User already exists.  Password inherited.');
+					$random_password = __('User already exists.  Password inherited.', 'singleid-first-class-login');
 				
 				}
 				
@@ -1114,7 +1163,7 @@ function singleid_options_page() {
     $options = get_option('SingleID_options');
 ?>
 		<h2><?php
-    _e('SingleID Options');
+    _e('SingleID Options', 'singleid-first-class-login');
 ?></h2>
 		
 		<h4>More option will be added. Do your requests on <a href="https://github.com/SingleID/singleid-first-class-login">github</a> </h4>
@@ -1125,7 +1174,7 @@ function singleid_options_page() {
 			
 			<tr>
 				<th scope="row"><?php
-    _e('Allow only login with SingleID');
+    _e('Allow only login with SingleID', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1133,7 +1182,7 @@ function singleid_options_page() {
     checked($options['fastloginonly'], 1);
 ?>/>
 						<?php
-    _e('Users will not be able to login with the password. But if they click on "password forgotten" they will receive an email with a new password');
+    _e('Users will not be able to login with the password. But if they click on "password forgotten" they will receive an email with a new password', 'singleid-first-class-login');
 ?>
 					</label></p>
 				</td>
@@ -1141,7 +1190,7 @@ function singleid_options_page() {
 			
 			<tr>
 				<th scope="row"><?php
-    _e('Disable actual password');
+    _e('Disable actual password', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1149,7 +1198,7 @@ function singleid_options_page() {
     checked($options['replace_old_password'], 1);
 ?>/>
 						<?php
-    _e('Disabling the plugin in future will force any SingleID user to follow the "password forgot" procedure');
+    _e('Disabling the plugin in future will force any SingleID user to follow the "password forgot" procedure', 'singleid-first-class-login');
 ?>
 					</label></p>
 				</td>
@@ -1157,7 +1206,7 @@ function singleid_options_page() {
 			
 			<tr>
 				<th scope="row"><?php
-    _e('Disable old login form for any user');
+    _e('Disable old login form for any user', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1165,7 +1214,7 @@ function singleid_options_page() {
     checked($options['avoid_mixed_login'], 1);
 ?>/>
 						<?php
-    _e('Any user must have SingleID to login into backoffice');
+    _e('Any user must have SingleID to login into backoffice', 'singleid-first-class-login');
 ?>
 					</label></p>
 				</td>
@@ -1174,7 +1223,7 @@ function singleid_options_page() {
 	<!--		
 			<tr>
 				<th scope="row"><?php
-    _e('Allow login only if smartphone is using the same network of the browser');
+    _e('Allow login only if smartphone is using the same network of the browser', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1182,7 +1231,7 @@ function singleid_options_page() {
     checked($options['sameip'], 1);
 ?>/>
 						<?php
-    _e('Really secure but with some disadvantages');
+    _e('Really secure but with some disadvantages', 'singleid-first-class-login');
 ?>
 					</label></p>
 				</td>
@@ -1193,7 +1242,7 @@ function singleid_options_page() {
 		
 		<p class="submit">
 		<input type="submit" value="<?php
-    echo esc_attr_e('Update Options');
+    echo esc_attr_e('Update Options', 'singleid-first-class-login');
 ?>" class="button-primary" />
 		</p>		
 	</form>
@@ -1377,4 +1426,19 @@ function singleid_AddWpMultiError() {
 
 
 
+function singleid_get_user_by_meta_data( $meta_key, $meta_value ) {
 
+	// Query for users based on the meta data
+	$user_query = new WP_User_Query(
+		array(
+			'meta_key'	  =>	$meta_key,
+			'meta_value'	=>	$meta_value
+		)
+	);
+
+	// Get the results from the query, returning the first user
+	$users = $user_query->get_results();
+	$int = $user_query->get_total();
+	return $int;
+
+} // end get_user_by_meta_data
