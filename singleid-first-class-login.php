@@ -171,6 +171,13 @@ add_action('admin_head', 'singleid_hide_buttons');
 
 // Add the admin page
 function singleid_add_users_page() {
+	
+	
+	// display an error mex in the admin backoffice
+	if ($_GET['error'] == 1){
+		add_action('admin_notices', 'singleid_admin_notice');				
+	}
+		
     global $current_user;
     $add_new = __('Add New', 'singleid-first-class-login');
     
@@ -289,7 +296,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
     if (singleid_is_SingleID($who)) {
 		$SingleID = $who;	// when we edit an user
 	} else {
-		$SingleID = $_POST['SingleID'];	//when we add a new user
+		$SingleID = $_POST['SingleID'];	// when we add a new user
 	}
 	
 	
@@ -297,9 +304,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
 				
 	if ($existent <> 0) { // there are no users with this SingleID associated
 	
-		// display an error mex in the admin backoffice
-		add_action('admin_notices', 'singleid_admin_notice');				
-		wp_redirect($_SERVER['HTTP_REFERER']);
+		wp_redirect($_SERVER['HTTP_REFERER'].'&error=1');
 		exit();
     				
     }
@@ -365,7 +370,7 @@ function singleid_add_new_admin_action($who, $existing_user_id = 0) {
         // if you are here means that the SingleID servers are down or misconfigurated
     }
     
-    wp_redirect($_SERVER['HTTP_REFERER']);
+    wp_redirect($_SERVER['HTTP_REFERER'].'&error=0'); // ugly but working TODO TOFIX
     exit();
 }
 
@@ -409,7 +414,7 @@ add_action('user_new_form_tag', 'singleid_do_not_use_this_page');
 
 
 function singleid_save_custom_user_profile_fields($user_id) {
-    // do this only if you can
+    // check again if you can
     if (!current_user_can('manage_options'))
         return false;
     
@@ -418,13 +423,11 @@ function singleid_save_custom_user_profile_fields($user_id) {
     
     
 		if ( $current_singleid == $_POST['SingleID']) {
-			// nothing to do ;-)!
-			
-			// but if the user wants to send again a new handshake requests??? we must give a chance. TODO
+			// nothing to do .. but if user wants to send again a new handshake requests??? we must give a chance. TODO
 		} else {
 			
 			// if is empty we remove and stop!
-			if (trim($_POST['SingleID']) == ''){
+			if (trim($_POST['SingleID']) == '') {
 				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
 			} else {
 			
@@ -434,15 +437,12 @@ function singleid_save_custom_user_profile_fields($user_id) {
 				
 				$existent = singleid_get_user_by_meta_data('SingleID', $_POST['SingleID']); // must be optimized
 				
-				if ($existent == 0) { // there are no users with this SingleID associated
-				
-				// check that SingleID are unique into the DB (password-sharing is scheduled for a next release of this plugin)
+				if ($existent == 0) { // check that SingleID are unique into the DB (password-sharing is scheduled for a next release of this plugin)
 				
 				// save *my* custom field
 				update_usermeta($user_id, 'SingleID', $_POST['SingleID']);
 				
-				
-					if (singleid_is_SingleID($_POST['SingleID'])){	// redundant after previous if
+					if (singleid_is_SingleID($_POST['SingleID'])) {	// redundant after previous if
 					
 						singleid_add_new_admin_action($_POST['SingleID'], $user_id); // is an update of an existing user!
 					
@@ -450,10 +450,8 @@ function singleid_save_custom_user_profile_fields($user_id) {
 				
 				} else {
 					// display an error mex in the admin backoffice
-					
 
 					add_action('admin_notices', 'singleid_admin_notice');
-
 
 				}
 				
@@ -466,11 +464,10 @@ function singleid_save_custom_user_profile_fields($user_id) {
 
 
 
-function singleid_admin_notice() {
-	
-echo '<div class="updated">
-   <p>No user has been updated</p>    
-</div>';    
+function singleid_admin_notice() { // ugly -> todo to be fixed!
+	$class 		= 'error';
+	$message 	= 'SingleID already associated to an user';
+    echo "<div class=\"$class\"> <p>$message</p></div>"; 
 
 }
 
