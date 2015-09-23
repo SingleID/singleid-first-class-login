@@ -1,6 +1,10 @@
 ![SingleID Official Logo](http://www.singleid.com/img/logonew.png)
 
-# SingleID plugin for Wordpress
+
+----------
+
+
+# Official plugin for Wordpress
 
 Version 1.1.5
 
@@ -8,11 +12,12 @@ Version 1.1.5
 ## What is SingleID
 
 SingleID is a open-source way to facilitate the exchange of attributes between users and websites.
-As long as we can define identity as a set of attributes related to an entity, we believe that the best way to exchange identity attributes doesn't involve account creation with strong password or using a keyboard to do some monkey form-filling work.
+We believe that, as long as we can define identity as a set of attributes related to an entity, the best way to exchange these attributes must not involve account creation with password.
 
-Our solutions is: Save your data once inside your smartphone and give a read access to whoever requests it each time.
+Our solution is:
+Saves data once inside your smartphone and give a read access to whoever requests it each time.
 
-We take care to develop the plugin for any platform who wants to reach your smartphone. And you will never bothered again from complex password and form filling.
+We will take care to develop the plugin for any websites and platforms who wants be able to reach your smartphone. And you will never bothered again from complex passwords to remember or to do any form-filling.
 
 
 
@@ -65,7 +70,7 @@ The missing fields will be read directly from the device during the first handsh
 
 
 
-### instead of the old
+### Instead of the previous
 
 ![Wordpress default login](https://dl.dropboxusercontent.com/u/10636650/screenshot-markdown-SingleID/wordpress/008-before-login.png)
 
