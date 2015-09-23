@@ -38,7 +38,7 @@
 * possibility to associate than one SingleID to login with a specific user
 * update profile infos at every login? only optionally
 * multisite testing
-* Better handling this cas: username already exist? 
+* Better handling this case: username already exist? 
 * 
 
 */
@@ -162,11 +162,17 @@ function singleid_hide_buttons() {
     global $current_screen;
     
     if (($current_screen->id == 'users') or ($current_screen->id == 'user-edit')){
-        echo '<style>.add-new-h2{display: none;}</style>'; 
+        echo '<style>
+        .add-new-h2{display: none;}
+        .page-title-action{display: none;}
+        </style>'; 
     }
     
     if (($current_screen->id == 'profile') or ($current_screen->id == 'user-edit')) {
-        echo '<style>#password{display: none;}.user-pass2-wrap{display: none;}</style>'; 
+        echo '<style>
+        #password{display: none;}
+        .user-pass2-wrap{display: none;}
+        </style>'; 
     }
     
 }
@@ -1212,7 +1218,7 @@ function singleid_options_page() {
 			
 			<tr>
 				<th scope="row"><?php
-    _e('Disable actual password', 'singleid-first-class-login');
+    _e('Replace actual users password', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1228,7 +1234,7 @@ function singleid_options_page() {
 			
 			<tr>
 				<th scope="row"><?php
-    _e('Disable old login form for any user', 'singleid-first-class-login');
+    _e('Disable login with username and password', 'singleid-first-class-login');
 ?></th>
 				<td colspan="3">
 				<p>	<label>
@@ -1236,7 +1242,7 @@ function singleid_options_page() {
     checked($options['avoid_mixed_login'], 1);
 ?>/>
 						<?php
-    _e('Any user must have SingleID to login into backoffice', 'singleid-first-class-login');
+    _e('Users must have SingleID to login into backoffice', 'singleid-first-class-login');
 ?>
 					</label></p>
 				</td>
@@ -1465,7 +1471,6 @@ function singleid_get_user_by_meta_data( $meta_key, $meta_value ) {
 
 
 function singleid_give_me_a_suitable_logo(){
-	// return 'http://singleid.com/wp-content/themes/singleid/img/logonew.png'; // FOR DEBUG PURPOSES ONLY !
 		// UGLY
 		// trying to detect the wordpress url 
 		// TODO! replace with better code asap
