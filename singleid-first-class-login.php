@@ -82,7 +82,7 @@ function singleid_custom_plugin_row_meta( $links, $file ) {
 
 	if ( strpos( $file, 'singleid-first-class-login.php' ) !== false ) {
 		$links[] = '<a href="options-general.php?page=singleid-options">Settings</a>';
-		$links[] = '<a href="https://github.com/SingleID/singleid-first-class-login/blob/master/UserFaq.md">User FAQ</a>';
+		$links[] = '<a href="https://github.com/SingleID/singleid-first-class-login#faq">User FAQ</a>';
 	}
 	
 	return $links;
@@ -156,9 +156,11 @@ function singleid_fcl_install() {
 
 
 
-function singleid_hide_buttons() {
+function singleid_hide_buttons() { // todo doesn't works on 4.3.1 ....
+	
 	// the old "add new" users button should be removed to avoid confusion
-	// this should be optional in a future release of this plugin
+	// this could be optional in a future release of this plugin
+	
     global $current_screen;
     
     if (($current_screen->id == 'users') or ($current_screen->id == 'user-edit')){
