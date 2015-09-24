@@ -8,6 +8,11 @@
 
 Version 1.1.5
 
+#### PLEASE NOTE:
+
+At 2015-09-23 this plugin works only with the [android version of SingleID](https://play.google.com/store/apps/developer?id=SingleID%20Inc). iOS and WindowsPhone versions are still under review process by Apple and Microsoft.
+
+---------- 
 
 ## What is SingleID
 
@@ -77,7 +82,8 @@ The missing fields will be read directly from the device during the first handsh
 
 
 
-## Still in progress
-Translations is still in progress
+## How much is secure?
 
+Is secure as using each time a string of 32 random chars as password.
+ 
 
