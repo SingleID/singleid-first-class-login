@@ -1357,6 +1357,9 @@ function singleid_send_request_to_singleid_server($fields, $fields_string) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FORBID_REUSE, 1); // redundant?
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 1); // default should be 1
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2); // default should be 2
     
     //execute post
     $result       = curl_exec($ch);
