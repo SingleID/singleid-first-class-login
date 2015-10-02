@@ -3,7 +3,7 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 1.1.3
+ * Version: 1.1.5
  * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
  * Text Domain: singleid-first-class-login
@@ -1171,7 +1171,7 @@ function singleid_options_defaults() {
     $defaults = array(
         'fastloginonly' => 1,
         'first_handshake_needed' => 1,
-        'avoid_mixed_login' => 1,
+        'avoid_mixed_login' => 0,
         'replace_old_password' => 0
     );
     
