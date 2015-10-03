@@ -63,7 +63,13 @@ add_filter( 'allowed_http_origin', '__return_true' ); // needed for allowing pos
 
 	//Check PHP password_hash function!
 	if (version_compare(PHP_VERSION, "5.3.7", "<")) {
+		if (version_compare(PHP_VERSION, "5.3.3", ">=")) {
 		require('lib/password.php'); // needed *only* for php =< 5.3.7 but >= 5.3.3
+		} else {
+			$mex = 'Sorry. Your php version ('.PHP_VERSION.') is too old for the SingleID Plugin. Consider to upgrade at least to 5.3.3';
+			error_log($mex);
+			wp_die($mex);
+		}
 	}
 
 
