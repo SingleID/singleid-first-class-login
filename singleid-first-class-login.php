@@ -3,7 +3,7 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 1.1.5
+ * Version: 1.1.6
  * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
  * Text Domain: singleid-first-class-login
@@ -68,7 +68,7 @@ add_filter( 'allowed_http_origin', '__return_true' ); // needed for allowing pos
 		} else {
 			$mex = 'Sorry. Your php version ('.PHP_VERSION.') is too old for the SingleID Plugin. Consider to upgrade at least to 5.3.3';
 			error_log($mex);
-			wp_die($mex);
+			// wp_die($mex);
 		}
 	}
 
@@ -78,7 +78,26 @@ function singleid_load_textdomain() {
 	load_plugin_textdomain( 'singleid-first-class-login', false, dirname( plugin_basename(__FILE__) ) . '/lang/' );
 }
 
+register_activation_hook( __FILE__, 'singleid_activate' );
 
+/**
+  * Plugin Activation hook function to check for Minimum PHP and WordPress versions
+  * @param string $wp Minimum version of WordPress required for this plugin
+  * @param string $php Minimum version of PHP required for this plugin
+  */
+ function singleid_activate( $wp = '3.5', $php = '5.3.3' ) {
+    global $wp_version;
+    if ( version_compare( PHP_VERSION, $php, '<' ) )
+        $flag = 'PHP';
+    elseif
+        ( version_compare( $wp_version, $wp, '<' ) )
+        $flag = 'WordPress';
+    else
+        return;
+    $version = 'PHP' == $flag ? $php : $wp;
+    deactivate_plugins( basename( __FILE__ ) );
+    wp_die('<p>The <strong>SingleID Wordpress Plugin</strong> plugin requires '.$flag.'  version '.$version.' or greater.</p>','Plugin Activation Error',  array( 'response'=>200, 'back_link'=>TRUE ) );
+}
 
 
 add_filter( 'plugin_row_meta', 'singleid_custom_plugin_row_meta', 10, 2 );
