@@ -14,7 +14,11 @@ PHP >= 5.3.3
 
 #### PLEASE NOTE:
 
-At 2015-09-23 this plugin works only with the [android](https://play.google.com/store/apps/developer?id=SingleID%20Inc) and  [iOS ](https://itunes.apple.com/us/app/singleid/id957303337?mt=8) release of SingleID. WindowsPhone versions is still under review by Microsoft and todate cannot be used as 2FA with Wordpress.
+At 2015-10-10 this plugin fully works only with the [android](https://play.google.com/store/apps/developer?id=SingleID%20Inc) release .
+
+Please note that on some webserver the [iOS ](https://itunes.apple.com/us/app/singleid/id957303337?mt=8) release could not works. A fix is already under review by Apple
+
+WindowsPhone versions todate cannot be used as 2FA with Wordpress.
 
 ---------- 
 
