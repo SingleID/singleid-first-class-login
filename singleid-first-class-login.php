@@ -3,7 +3,7 @@
  * Plugin Name: SingleID First-class Login Experience
  * Plugin URI: https://github.com/SingleID/singleid-first-class-login/
  * Description: Enjoy the first-class login experience for your wordpress backoffice
- * Version: 1.1.6
+ * Version: 1.1.7
  * Author: SingleID Inc.
  * Author URI: http://www.singleid.com
  * Text Domain: singleid-first-class-login
@@ -162,7 +162,7 @@ function singleid_fcl_install() {
 	  `WpUserId` INT( 11 ) UNSIGNED NOT NULL,
 	  UNIQUE KEY `bcrypted_UTID` (`bcrypted_UTID`),
 	  KEY `UTID` (`UTID`)
-	) ENGINE=MEMORY DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
+	) DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
     
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     
@@ -1353,8 +1353,8 @@ function singleid_send_request_to_singleid_server($fields, $fields_string) {
 		$table_data = $wpdb->prefix . 'SingleID_users_raw_data';
 		$sql        = "DELETE FROM `$table_data` WHERE right_now < " .($now - 600);
 		$wpdb->query($sql);
-		$sql        = "ALTER TABLE `$table_data` ENGINE=MEMORY";	// free memory needed
-		$wpdb->query($sql);
+		//$sql        = "ALTER TABLE `$table_data` ENGINE=MEMORY";	// free memory needed
+		//$wpdb->query($sql);
 	}
     
     $ip = singleid_gimme_visitor_ip();
